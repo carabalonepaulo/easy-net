@@ -10,6 +10,8 @@ use enet_sys::{
 };
 use gen_slab::GenSlab;
 
+use crate::ensure_enet_init;
+
 pub const EVENT_CONNECT: i32 = 1;
 pub const EVENT_DISCONNECT: i32 = 2;
 pub const EVENT_RECEIVE: i32 = 3;
@@ -39,11 +41,9 @@ unsafe impl Send for Server {}
 
 impl Server {
     pub fn new(port: u16, max_conn: usize) -> Result<Self, Error> {
-        unsafe {
-            if enet_sys::enet_initialize() != 0 {
-                return Err(Error::FailedToInit);
-            }
+        ensure_enet_init();
 
+        unsafe {
             let addr = ENetAddress {
                 host: ENET_HOST_ANY,
                 port,
@@ -176,7 +176,6 @@ impl Drop for Server {
         unsafe {
             enet_host_flush(self.host);
             enet_host_destroy(self.host);
-            enet_deinitialize();
         }
     }
 }
