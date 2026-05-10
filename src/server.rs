@@ -20,7 +20,7 @@ pub enum Error {
 
 #[derive(Debug)]
 pub enum ServerEvent {
-    ClientConnect(u64),
+    ClientConnected(u64),
     ClientDisconnected(u64),
     PacketReceived(u64, Vec<u8>),
 }
@@ -73,7 +73,7 @@ impl Server {
                     EVENT_CONNECT => {
                         let id = self.clients.insert(ev.peer as *mut _);
                         (*ev.peer).data = id as *mut _;
-                        self.events.push_back(ServerEvent::ClientConnect(id));
+                        self.events.push_back(ServerEvent::ClientConnected(id));
                         count += 1;
                     }
                     EVENT_DISCONNECT => {
