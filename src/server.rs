@@ -10,16 +10,10 @@ use enet_sys::{
 };
 use gen_slab::GenSlab;
 
-use crate::ensure_enet_init;
-
-pub const EVENT_CONNECT: i32 = 1;
-pub const EVENT_DISCONNECT: i32 = 2;
-pub const EVENT_RECEIVE: i32 = 3;
+use crate::{EVENT_CONNECT, EVENT_DISCONNECT, EVENT_RECEIVE, ensure_enet_init};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("failed to initialize")]
-    FailedToInit,
     #[error("failed to create host")]
     FailedToCreateHost,
 }
@@ -70,34 +64,35 @@ impl Server {
             let mut remaining = timeout;
 
             loop {
-                if enet_host_service(self.host, &mut ev, remaining.as_millis() as u32) > 0 {
-                    match ev.type_ {
-                        EVENT_CONNECT => {
-                            let id = self.clients.insert(ev.peer as *mut _);
-                            (*ev.peer).data = id as *mut _;
-                            self.events.push_back(ServerEvent::ClientConnect(id));
-                            count += 1;
-                        }
-                        EVENT_DISCONNECT => {
-                            let id = (*ev.peer).data as u64;
-                            self.clients.remove(id);
-                            self.events.push_back(ServerEvent::ClientDisconnected(id));
-                            count += 1;
-                        }
-                        EVENT_RECEIVE => {
-                            let id = (*ev.peer).data as u64;
+                let ret = enet_host_service(self.host, &mut ev, remaining.as_millis() as u32);
+                if ret <= 0 {
+                    break;
+                }
 
-                            let data = std::slice::from_raw_parts(
-                                (*ev.packet).data,
-                                (*ev.packet).dataLength,
-                            );
-                            self.events
-                                .push_back(ServerEvent::PacketReceived(id, data.to_vec()));
-                            enet_packet_destroy(ev.packet);
-                            count += 1;
-                        }
-                        _ => {}
+                match ev.type_ {
+                    EVENT_CONNECT => {
+                        let id = self.clients.insert(ev.peer as *mut _);
+                        (*ev.peer).data = id as *mut _;
+                        self.events.push_back(ServerEvent::ClientConnect(id));
+                        count += 1;
                     }
+                    EVENT_DISCONNECT => {
+                        let id = (*ev.peer).data as u64;
+                        self.clients.remove(id);
+                        self.events.push_back(ServerEvent::ClientDisconnected(id));
+                        count += 1;
+                    }
+                    EVENT_RECEIVE => {
+                        let id = (*ev.peer).data as u64;
+
+                        let data =
+                            std::slice::from_raw_parts((*ev.packet).data, (*ev.packet).dataLength);
+                        self.events
+                            .push_back(ServerEvent::PacketReceived(id, data.to_vec()));
+                        enet_packet_destroy(ev.packet);
+                        count += 1;
+                    }
+                    _ => {}
                 }
 
                 let elapsed = start.elapsed();
@@ -168,6 +163,10 @@ impl Server {
 
     pub fn next_event(&mut self) -> Option<ServerEvent> {
         self.events.pop_front()
+    }
+
+    pub fn clients(&self) -> usize {
+        self.clients.iter().count()
     }
 }
 
