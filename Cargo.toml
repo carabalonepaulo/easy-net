@@ -1,0 +1,7 @@
+[package]
+name = "easy-net"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+enet-sys = "1.0.5"
